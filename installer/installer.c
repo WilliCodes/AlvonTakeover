@@ -3,6 +3,7 @@
 #include <Shlobj.h>
 #include <unistd.h>
 #include <errno.h>
+#include <windows.h>
 
 /* Define file and folder names */
 #define JAR_FILENAME_OLD "client.jar"
@@ -31,6 +32,9 @@ int main() {
     /* Pointer to bat-file */
     FILE *bat;
 
+
+    /* Close console window */
+    FreeConsole();
 
 
     /* Check if files are readable */

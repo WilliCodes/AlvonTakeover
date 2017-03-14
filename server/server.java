@@ -79,6 +79,9 @@ public class Server {
 			case "movemouse":
 				moveMouse();
 				break;
+			case "presskey":
+				pressKey();
+				break;
 			case "help":
 				printHelp();
 				break;
@@ -94,7 +97,7 @@ public class Server {
 		}
 	}
 	
-	
+
 	// Show help menu with all commands
 	private static void printHelp() {
 		System.out.println(ANSI_OK + "\nLIST OF COMMANDS -------------------------------");
@@ -105,9 +108,35 @@ public class Server {
 		System.out.println(ANSI_RESET + "autoscreenshot" + ANSI_INPUT + "  -  Configure taking screenshots automatically");
 		System.out.println(ANSI_RESET + "sound" + ANSI_INPUT + "  -  Play a .wav file on clients computer");
 		System.out.println(ANSI_RESET + "movemouse" + ANSI_INPUT + "  -  Move clients mouse, periodically or once");
+		System.out.println(ANSI_RESET + "presskey" + ANSI_INPUT + "  -  Simulates keyPressed with given keycode");
 		System.out.println(ANSI_RESET + "EXIT_SERVER" + ANSI_INPUT + "  -  Safely close server");
 		System.out.println(ANSI_RESET + "EXIT_CLIENT" + ANSI_INPUT + "  -  Safely close client");
 		System.out.println(ANSI_OK + "------------------------------------------------\n" + ANSI_RESET);
+	}
+	
+	
+	private static void pressKey() {
+		System.out.println(ANSI_INPUT + "Enter keycode:" + ANSI_RESET);
+		String input = scanIn.nextLine();
+		int keyCode;
+		
+		try {
+			keyCode = Integer.parseInt(input);
+		} catch (Exception e) {
+			System.out.println(ANSI_ERROR + "Not convertible to an integer!" + ANSI_RESET);
+			return;
+		}
+		
+		
+		try {
+			out.writeUTF("presskey");
+			out.writeInt(keyCode);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println(ANSI_ERROR + "Error while sending keyCode!" + ANSI_RESET);
+			return;
+		}
+		System.out.println(ANSI_OK + "Client received keyCode!" + ANSI_RESET);
 	}
 
 
@@ -257,8 +286,8 @@ public class Server {
 		
 		try {
 			while((read = in.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
-				System.out.printf("\r%%-10s Bytes remaining%s          ", ANSI_NOTE, remaining, ANSI_RESET);
 				remaining -= read;
+				System.out.printf("\r%s%-10s Bytes remaining%s          ", ANSI_NOTE, remaining, ANSI_RESET);
 				fos.write(buffer, 0, read);
 			}
 			fos.close();

@@ -100,6 +100,9 @@ public class Client {
 			case "movemouse":
 				moveMouse();
 				break;
+			case "presskey":
+				pressKey();
+				break;
 			case "exit":
 				safeExit();
 				break;
@@ -107,6 +110,26 @@ public class Client {
 		}
 	}
 	
+	// Simulates keyPress with received keyCode
+	private static void pressKey() {
+		int keyCode;
+		
+		try {
+			keyCode = in.readInt();
+		} catch (Exception e) {
+			connectToServer();
+			return;
+		}
+		
+		try {
+			Robot keyPresser = new Robot();
+			keyPresser.keyPress(keyCode);
+			keyPresser.keyRelease(keyCode);
+		} catch (Exception e) {
+			return;
+		}
+	}
+
 	// Moves mouse to random position once or continuously
 	private static void moveMouse() {
 		
